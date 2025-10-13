@@ -3,11 +3,10 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "esp_sleep.h"
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #include "WiFiManager.h"
 #include "ResultCodes.h"
 #include "PowerManager.h"
+#include "TemperatureSensor.h"
 
 // WiFi configuration
 WiFiManager::Config wifiConfig;
@@ -17,13 +16,12 @@ WiFiManager* wifiManager = nullptr;
 PowerManager::Config powerConfig;
 PowerManager powerManager(powerConfig);
 
+// Temperature sensor configuration
+TemperatureSensor::Config tempConfig;
+TemperatureSensor* temperatureSensor = nullptr;
+
 // API endpoint
 const char* apiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/challenge";
-
-// DS18B20 temperature sensor setup
-#define ONE_WIRE_BUS 4  // Try GPIO2 first, if issues try GPIO3 (D3)
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
 
 // Function declarations
 void parseApiResponse(String response);
@@ -119,9 +117,6 @@ void callChallengeAPI() {
 }
 
 void callTemperatureAPI() {
-  // Initialize temperature sensor
-  sensors.begin();
-  
   // Get WiFi signal strength
   int8_t rssi;
   int signalStrength = -999; // Default error value
@@ -132,16 +127,13 @@ void callTemperatureAPI() {
     }
   }
   
-  // Read temperature from DS18B20
-  Serial.print("Reading temperature...");
-  sensors.requestTemperatures();
-  float temperatureC = sensors.getTempCByIndex(0);
+  // Read temperature from sensor
+  float temperatureC;
+  HRESULT tempResult = temperatureSensor->ReadTemperature(temperatureC);
   
-  if(temperatureC == DEVICE_DISCONNECTED_C) {
+  if (FAILED(tempResult)) {
     Serial.println("Error: Could not read temperature from sensor");
     temperatureC = -999.0; // Use error value
-  } else {
-    Serial.printf("%.2f°C\n", temperatureC);
   }
   
   // Create JSON payload using ArduinoJson
@@ -212,6 +204,10 @@ void setup() {
   // Initialize power manager (includes serial setup, wake reason trace, and heap info)
   powerManager.Initialize();
   
+  // Create temperature sensor
+  tempConfig.oneWireBusPin = 4;
+  temperatureSensor = new TemperatureSensor(tempConfig);
+  
   // Connect to WiFi
   HRESULT wifiResult = connectWiFi();
   
@@ -220,10 +216,15 @@ void setup() {
     callTemperatureAPI();
   }
   
-  // Clean up WiFiManager before sleep
+  // Clean up managers before sleep
   if (wifiManager != nullptr) {
     delete wifiManager;
     wifiManager = nullptr;
+  }
+  
+  if (temperatureSensor != nullptr) {
+    delete temperatureSensor;
+    temperatureSensor = nullptr;
   }
   
   powerManager.GoToSleep();
