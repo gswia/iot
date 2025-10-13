@@ -3,6 +3,8 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include "esp_sleep.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
 // WiFi credentials - replace with your network details
 const char* ssid = "Swiatki";
@@ -11,9 +13,15 @@ const char* password = "Lamik290875";
 // API endpoint
 const char* apiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/challenge";
 
+// DS18B20 temperature sensor setup
+#define ONE_WIRE_BUS 4  // Try GPIO2 first, if issues try GPIO3 (D3)
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
 // Function declarations
 void parseApiResponse(String response);
 void callChallengeAPI();
+void callTemperatureAPI();
 void connectWiFi();
 
 void parseApiResponse(String response) {
@@ -96,7 +104,71 @@ void callChallengeAPI() {
   }
 }
 
-
+void callTemperatureAPI() {
+  // Initialize temperature sensor
+  sensors.begin();
+  
+  // Get WiFi signal strength
+  int signalStrength = WiFi.RSSI();
+  
+  // Read temperature from DS18B20
+  Serial.print("Reading temperature...");
+  sensors.requestTemperatures();
+  float temperatureC = sensors.getTempCByIndex(0);
+  
+  if(temperatureC == DEVICE_DISCONNECTED_C) {
+    Serial.println("Error: Could not read temperature from sensor");
+    temperatureC = -999.0; // Use error value
+  } else {
+    Serial.printf("%.2f°C\n", temperatureC);
+  }
+  
+  // Create JSON payload using ArduinoJson
+  JsonDocument payloadDoc;
+  payloadDoc["deviceId"] = "chujka";
+  payloadDoc["wifiSignalStrengthDbm"] = signalStrength;
+  payloadDoc["temperatureCelsius"] = temperatureC;
+  
+  String jsonPayload;
+  serializeJson(payloadDoc, jsonPayload);
+  
+  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C)\n", jsonPayload.c_str(), signalStrength, temperatureC);
+  
+  const int maxRetries = 3;
+  bool success = false;
+  const char* temperatureApiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/temperature";
+  
+  for (int attempt = 1; attempt <= maxRetries && !success; attempt++) {
+    Serial.printf("Calling temperature API (attempt %d/%d)...\n", attempt, maxRetries);
+    
+    HTTPClient http;
+    http.begin(temperatureApiUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(15000); // 15 second timeout
+    
+    int httpResponseCode = http.POST(jsonPayload);
+    
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println("Temperature API Response:");
+      Serial.println(response);
+      success = true;
+    } else {
+      Serial.printf("Error on HTTP request (attempt %d): %d\n", attempt, httpResponseCode);
+      
+      if (attempt < maxRetries) {
+        Serial.printf("Retrying in 2 seconds...\n");
+        delay(2000); // Wait 2 seconds before retry
+      }
+    }
+    
+    http.end();
+  }
+  
+  if (!success) {
+    Serial.println("All temperature API attempts failed!");
+  }
+}
 
 void connectWiFi() {
   Serial.print("Connecting to WiFi");
@@ -148,17 +220,16 @@ void setup() {
   // Connect to WiFi
   connectWiFi();
   
-  // Call the challenge API
-  callChallengeAPI();
+  // Call the temperature API instead of challenge API
+  callTemperatureAPI();
   
-  // Go to deep sleep for 30 seconds (increased for testing)
+  // Go to deep sleep for 30 seconds
   Serial.println("========================================");
-  Serial.println("Going to deep sleep for 30 seconds...");
-  Serial.println("*** DISCONNECT AND RECONNECT SERIAL MONITOR NOW ***");
+  Serial.println("Going to deep sleep for 120 seconds...");
   Serial.println("========================================");
   Serial.flush(); // Ensure message is sent before sleep
   
-  esp_sleep_enable_timer_wakeup(30 * 1000000); // 30 seconds in microseconds
+  esp_sleep_enable_timer_wakeup(60*2 * 1000000); // 30 seconds in microseconds
   esp_deep_sleep_start();
 }
 
