@@ -7,8 +7,8 @@ WiFiManager::WiFiManager(const Config& config) : config_(config) {
 HRESULT WiFiManager::Connect() {
     HRESULT result = E_WIFI_NOT_CONNECTED;
     
-    Serial.printf("+ WiFiManager::Connect()");
-    Serial.printf("WiFi connecting to '%s'", config_.ssid);
+    Serial.printf("+ WiFiManager::Connect()\n");
+    Serial.printf("WiFi connecting to '%s'\n", config_.ssid);
     
     for (uint8_t attempt = 1; attempt <= config_.maxRetries; attempt++) {
         Serial.printf(" (attempt %d/%d)", attempt, config_.maxRetries);

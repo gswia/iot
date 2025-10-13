@@ -7,10 +7,15 @@
 #include <DallasTemperature.h>
 #include "WiFiManager.h"
 #include "ResultCodes.h"
+#include "PowerManager.h"
 
 // WiFi configuration
 WiFiManager::Config wifiConfig;
 WiFiManager* wifiManager = nullptr;
+
+// Power configuration
+PowerManager::Config powerConfig;
+PowerManager powerManager(powerConfig);
 
 // API endpoint
 const char* apiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/challenge";
@@ -238,14 +243,7 @@ void setup() {
     wifiManager = nullptr;
   }
   
-  // Go to deep sleep for 30 seconds regardless of WiFi connection status
-  Serial.println("========================================");
-  Serial.println("Going to deep sleep for 30 seconds...");
-  Serial.println("========================================");
-  Serial.flush(); // Ensure message is sent before sleep
-  
-  esp_sleep_enable_timer_wakeup(30 * 1000000); // 30 seconds in microseconds
-  esp_deep_sleep_start();
+  powerManager.GoToSleep();
 }
 
 void loop() {
