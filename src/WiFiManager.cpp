@@ -4,13 +4,26 @@ WiFiManager::WiFiManager(const Config& config) : config_(config) {
     initializeWiFi();
 }
 
-bool WiFiManager::Connect() {
+HRESULT WiFiManager::Connect() {
+    HRESULT result = E_WIFI_NOT_CONNECTED;
+    
+    Serial.printf("+ WiFiManager::Connect()");
     Serial.printf("WiFi connecting to '%s'", config_.ssid);
     
     for (uint8_t attempt = 1; attempt <= config_.maxRetries; attempt++) {
         Serial.printf(" (attempt %d/%d)", attempt, config_.maxRetries);
         
-        if (performSingleConnection()) {
+        // Perform single connection attempt
+        WiFi.begin(config_.ssid, config_.password);
+        
+        uint32_t startTime = millis();
+        while (WiFi.status() != WL_CONNECTED && 
+               (millis() - startTime) < connectionTimeoutMs_) {
+            delay(500);
+            Serial.print(".");
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) {
             Serial.println(" - Success!");
             int8_t signal;
             if (GetSignalStrength(signal) == S_OK) {
@@ -19,7 +32,8 @@ bool WiFiManager::Connect() {
             } else {
                 Serial.printf("Connected! IP: %s\n", GetLocalIP().toString().c_str());
             }
-            return true;
+            result = S_OK;
+            goto ErrReturn;
         }
         
         Serial.printf(" - Failed");
@@ -30,7 +44,10 @@ bool WiFiManager::Connect() {
     }
     
     Serial.println(" - All attempts failed!");
-    return false;
+    
+ErrReturn:
+    Serial.println("- WiFiManager::Connect()");
+    return result;
 }
 
 bool WiFiManager::IsConnected() const {
@@ -45,7 +62,7 @@ void WiFiManager::Disconnect() {
     }
 }
 
-int32_t WiFiManager::GetSignalStrength(int8_t& rssi) const {
+HRESULT WiFiManager::GetSignalStrength(int8_t& rssi) const {
     if (IsConnected()) {
         rssi = WiFi.RSSI();
         return S_OK;
@@ -63,19 +80,6 @@ String WiFiManager::GetSSID() const {
 
 WiFiManager::Config WiFiManager::GetConfig() const {
     return config_;
-}
-
-bool WiFiManager::performSingleConnection() {
-    WiFi.begin(config_.ssid, config_.password);
-    
-    uint32_t startTime = millis();
-    while (WiFi.status() != WL_CONNECTED && 
-           (millis() - startTime) < connectionTimeoutMs_) {
-        delay(500);
-        Serial.print(".");
-    }
-    
-    return WiFi.status() == WL_CONNECTED;
 }
 
 void WiFiManager::initializeWiFi() {

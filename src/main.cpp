@@ -5,10 +5,12 @@
 #include "esp_sleep.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include "WiFiManager.h"
+#include "ResultCodes.h"
 
-// WiFi credentials - replace with your network details
-const char* ssid = "Swiatki";
-const char* password = "Lamik290875";
+// WiFi configuration
+WiFiManager::Config wifiConfig;
+WiFiManager* wifiManager = nullptr;
 
 // API endpoint
 const char* apiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/challenge";
@@ -22,7 +24,7 @@ DallasTemperature sensors(&oneWire);
 void parseApiResponse(String response);
 void callChallengeAPI();
 void callTemperatureAPI();
-void connectWiFi();
+HRESULT connectWiFi();
 
 void parseApiResponse(String response) {
   // Create a JSON document
@@ -54,7 +56,14 @@ void parseApiResponse(String response) {
 
 void callChallengeAPI() {
   // Get WiFi signal strength
-  int signalStrength = WiFi.RSSI();
+  int8_t rssi;
+  int signalStrength = -999; // Default error value
+  if (wifiManager != nullptr) {
+    HRESULT result = wifiManager->GetSignalStrength(rssi);
+    if (SUCCEEDED(result)) {
+      signalStrength = rssi;
+    }
+  }
   
   // Create JSON payload using ArduinoJson
   JsonDocument payloadDoc;
@@ -109,7 +118,14 @@ void callTemperatureAPI() {
   sensors.begin();
   
   // Get WiFi signal strength
-  int signalStrength = WiFi.RSSI();
+  int8_t rssi;
+  int signalStrength = -999; // Default error value
+  if (wifiManager != nullptr) {
+    HRESULT result = wifiManager->GetSignalStrength(rssi);
+    if (SUCCEEDED(result)) {
+      signalStrength = rssi;
+    }
+  }
   
   // Read temperature from DS18B20
   Serial.print("Reading temperature...");
@@ -170,30 +186,21 @@ void callTemperatureAPI() {
   }
 }
 
-void connectWiFi() {
-  Serial.print("Connecting to WiFi");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+HRESULT connectWiFi() {
+  // Initialize config
+  wifiConfig.ssid = "Swiatki";
+  wifiConfig.password = "Lamik290875";
+  wifiConfig.maxRetries = 3;
+  wifiConfig.retryDelayMs = 2000;
   
-  int timeout = 0;
-  while (WiFi.status() != WL_CONNECTED && timeout < 20) { // 10 second timeout
-    delay(500);
-    Serial.print(".");
-    timeout++;
+  // Create WiFiManager instance
+  if (wifiManager == nullptr) {
+    wifiManager = new WiFiManager(wifiConfig);
   }
   
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println();
-    Serial.println("WiFi connected!");
-    Serial.printf("IP: %s, Signal: %d dBm\n", 
-                  WiFi.localIP().toString().c_str(), WiFi.RSSI());
-  } else {
-    Serial.println();
-    Serial.println("WiFi connection failed, going to sleep...");
-    Serial.flush();
-    esp_sleep_enable_timer_wakeup(10 * 1000000); // 10 seconds
-    esp_deep_sleep_start();
-  }
+  HRESULT connectResult = wifiManager->Connect();
+  
+  return connectResult;
 }
 
 void setup() {
@@ -218,18 +225,20 @@ void setup() {
   Serial.println("========================================");
   
   // Connect to WiFi
-  connectWiFi();
+  HRESULT wifiResult = connectWiFi();
   
-  // Call the temperature API instead of challenge API
-  callTemperatureAPI();
+  if (SUCCEEDED(wifiResult)) {
+    // Call the temperature API instead of challenge API
+    callTemperatureAPI();
+  }
   
-  // Go to deep sleep for 30 seconds
+  // Go to deep sleep for 30 seconds regardless of WiFi connection status
   Serial.println("========================================");
-  Serial.println("Going to deep sleep for 120 seconds...");
+  Serial.println("Going to deep sleep for 30 seconds...");
   Serial.println("========================================");
   Serial.flush(); // Ensure message is sent before sleep
   
-  esp_sleep_enable_timer_wakeup(60*2 * 1000000); // 30 seconds in microseconds
+  esp_sleep_enable_timer_wakeup(30 * 1000000); // 30 seconds in microseconds
   esp_deep_sleep_start();
 }
 

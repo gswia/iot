@@ -20,12 +20,12 @@ public:
     WiFiManager(const Config& config);
     
     // Core functionality
-    bool Connect();                    // Returns true if connected after retries
+    HRESULT Connect();                 // Returns S_OK on success, error code on failure
     bool IsConnected() const;
     void Disconnect();
     
     // Network information
-    int32_t GetSignalStrength(int8_t& rssi) const;  // Returns S_OK on success, E_NOT_CONNECTED on failure
+    HRESULT GetSignalStrength(int8_t& rssi) const;  // Returns S_OK on success, E_WIFI_NOT_CONNECTED on failure
     IPAddress GetLocalIP() const;
     String GetSSID() const;
     
@@ -37,7 +37,6 @@ private:
     uint32_t connectionTimeoutMs_ = 10000;  // Fixed timeout per attempt
     
     // Internal methods
-    bool performSingleConnection();
     void initializeWiFi();
 };
 
