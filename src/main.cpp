@@ -232,6 +232,12 @@ void setup() {
     callTemperatureAPI();
   }
   
+  // Clean up WiFiManager before sleep
+  if (wifiManager != nullptr) {
+    delete wifiManager;
+    wifiManager = nullptr;
+  }
+  
   // Go to deep sleep for 30 seconds regardless of WiFi connection status
   Serial.println("========================================");
   Serial.println("Going to deep sleep for 30 seconds...");
