@@ -209,25 +209,8 @@ HRESULT connectWiFi() {
 }
 
 void setup() {
-  // Initialize serial communication at 115200 baud rate
-  Serial.begin(115200);
-  delay(1000); // Give serial monitor time to reconnect
-  
-  // Print multiple messages to ensure visibility
-  Serial.println();
-  Serial.println("========================================");
-  
-  // Check wake reason
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
-    Serial.println("*** WAKING UP FROM DEEP SLEEP ***");
-  } else {
-    Serial.println("*** STARTING UP (POWER-ON/RESET) ***");
-  }
-  
-  Serial.printf("Wake reason: %d\n", wakeup_reason);
-  Serial.printf("Free heap: %d bytes\n", ESP.getFreeHeap());
-  Serial.println("========================================");
+  // Initialize power manager (includes serial setup, wake reason trace, and heap info)
+  powerManager.Initialize();
   
   // Connect to WiFi
   HRESULT wifiResult = connectWiFi();

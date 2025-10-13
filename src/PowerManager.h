@@ -18,6 +18,9 @@ public:
     // Core sleep functionality
     void GoToSleep(); // Uses duration from config
     
+    // Initialization and wake up tracing
+    void Initialize();
+    
     // Configuration access
     Config GetConfig() const;
     
