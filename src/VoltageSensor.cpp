@@ -24,18 +24,28 @@ HRESULT VoltageSensor::ReadRawADC(uint16_t& rawValue)
     // Initialize ADC if not already done
     Initialize();
     
-    // Read ADC value
+    // Read ADC value 16 times and take average for stability
     Serial.print("Reading ADC...");
-    int adcReading = analogRead(m_config.adcPin);
+    const int numReadings = 16;
+    long sum = 0;
     
-    // Check for valid reading range (0-4095 for 12-bit ADC)
-    if (adcReading < 0 || adcReading > 4095) {
+    // Take multiple readings and sum them
+    for (int i = 0; i < numReadings; i++) {
+        sum += analogReadMilliVolts(m_config.adcPin);
+        delay(1); // Small delay between readings
+    }
+    
+    // Calculate average
+    int averageReading = sum / numReadings;
+    
+    // Check for valid reading range (allow for ADC calibration variations)
+    if (averageReading < 0 || averageReading > 4000) {
         Serial.println("Error: ADC reading out of range");
         return E_ADC_OUT_OF_RANGE;
     }
     
-    rawValue = (uint16_t)adcReading;
-    Serial.printf("%d\n", rawValue);
+    rawValue = (uint16_t)averageReading;
+    Serial.printf("%d mV (average of %d readings)\n", rawValue, numReadings);
     return S_OK;
 }
 

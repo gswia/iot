@@ -142,12 +142,12 @@ void callTemperatureAPI() {
   }
   
   // Read battery voltage from ADC
-  uint16_t batteryAdcValue;
-  HRESULT voltageResult = voltageSensor->ReadRawADC(batteryAdcValue);
+  uint16_t batteryAdcVoltage;
+  HRESULT voltageResult = voltageSensor->ReadRawADC(batteryAdcVoltage);
   
   if (FAILED(voltageResult)) {
     Serial.println("Error: Could not read voltage from sensor");
-    batteryAdcValue = 0; // Use error value
+    batteryAdcVoltage = 0; // Use error value
   }
   
   // Create JSON payload using ArduinoJson
@@ -155,12 +155,12 @@ void callTemperatureAPI() {
   payloadDoc["deviceId"] = "chujka";
   payloadDoc["wifiSignalStrengthDbm"] = signalStrength;
   payloadDoc["temperatureCelsius"] = temperatureC;
-  payloadDoc["batteryAdcValue"] = batteryAdcValue;
+  payloadDoc["batteryAdcVoltage"] = batteryAdcVoltage;
   
   String jsonPayload;
   serializeJson(payloadDoc, jsonPayload);
   
-  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C, ADC: %d)\n", jsonPayload.c_str(), signalStrength, temperatureC, batteryAdcValue);
+  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C, Voltage: %d mV)\n", jsonPayload.c_str(), signalStrength, temperatureC, batteryAdcVoltage);
   
   const int maxRetries = 3;
   bool success = false;
