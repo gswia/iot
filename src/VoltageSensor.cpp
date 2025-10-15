@@ -1,4 +1,5 @@
 #include "VoltageSensor.h"
+#include "utils.h"
 
 VoltageSensor::VoltageSensor(const Config& config)
     : m_config(config)
@@ -24,28 +25,28 @@ HRESULT VoltageSensor::ReadRawADC(uint16_t& rawValue)
     // Initialize ADC if not already done
     Initialize();
     
-    // Read ADC value 16 times and take average for stability
+    // Read ADC value 16 times and take median for stability
     Serial.print("Reading ADC...");
     const int numReadings = 16;
-    long sum = 0;
+    uint16_t readings[numReadings];
     
-    // Take multiple readings and sum them
+    // Take multiple readings and store them
     for (int i = 0; i < numReadings; i++) {
-        sum += analogReadMilliVolts(m_config.adcPin);
+        readings[i] = analogReadMilliVolts(m_config.adcPin);
         delay(1); // Small delay between readings
     }
     
-    // Calculate average
-    int averageReading = sum / numReadings;
+    // Calculate median
+    uint16_t medianReading = calculateMedian(readings, numReadings);
     
     // Check for valid reading range (allow for ADC calibration variations)
-    if (averageReading < 0 || averageReading > 4000) {
+    if (medianReading > 4000) {
         Serial.println("Error: ADC reading out of range");
         return E_ADC_OUT_OF_RANGE;
     }
     
-    rawValue = (uint16_t)averageReading;
-    Serial.printf("%d mV (average of %d readings)\n", rawValue, numReadings);
+    rawValue = medianReading;
+    Serial.printf("%d mV (median of %d readings)\n", rawValue, numReadings);
     return S_OK;
 }
 
