@@ -7,6 +7,7 @@
 #include "ResultCodes.h"
 #include "PowerManager.h"
 #include "TemperatureSensor.h"
+#include "VoltageSensor.h"
 
 // WiFi configuration
 WiFiManager::Config wifiConfig;
@@ -19,6 +20,10 @@ PowerManager powerManager(powerConfig);
 // Temperature sensor configuration
 TemperatureSensor::Config tempConfig;
 TemperatureSensor* temperatureSensor = nullptr;
+
+// Voltage sensor configuration
+VoltageSensor::Config voltageConfig;
+VoltageSensor* voltageSensor = nullptr;
 
 // API endpoint
 const char* apiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/challenge";
@@ -136,16 +141,26 @@ void callTemperatureAPI() {
     temperatureC = -999.0; // Use error value
   }
   
+  // Read battery voltage from ADC
+  uint16_t batteryAdcValue;
+  HRESULT voltageResult = voltageSensor->ReadRawADC(batteryAdcValue);
+  
+  if (FAILED(voltageResult)) {
+    Serial.println("Error: Could not read voltage from sensor");
+    batteryAdcValue = 0; // Use error value
+  }
+  
   // Create JSON payload using ArduinoJson
   JsonDocument payloadDoc;
   payloadDoc["deviceId"] = "chujka";
   payloadDoc["wifiSignalStrengthDbm"] = signalStrength;
   payloadDoc["temperatureCelsius"] = temperatureC;
+  payloadDoc["batteryAdcValue"] = batteryAdcValue;
   
   String jsonPayload;
   serializeJson(payloadDoc, jsonPayload);
   
-  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C)\n", jsonPayload.c_str(), signalStrength, temperatureC);
+  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C, ADC: %d)\n", jsonPayload.c_str(), signalStrength, temperatureC, batteryAdcValue);
   
   const int maxRetries = 3;
   bool success = false;
@@ -208,6 +223,10 @@ void setup() {
   tempConfig.oneWireBusPin = 4;
   temperatureSensor = new TemperatureSensor(tempConfig);
   
+  // Create voltage sensor
+  voltageConfig.adcPin = 2;
+  voltageSensor = new VoltageSensor(voltageConfig);
+  
   // Connect to WiFi
   HRESULT wifiResult = connectWiFi();
   
@@ -225,6 +244,11 @@ void setup() {
   if (temperatureSensor != nullptr) {
     delete temperatureSensor;
     temperatureSensor = nullptr;
+  }
+  
+  if (voltageSensor != nullptr) {
+    delete voltageSensor;
+    voltageSensor = nullptr;
   }
   
   powerManager.GoToSleep();
