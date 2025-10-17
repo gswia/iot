@@ -21,9 +21,13 @@ PowerManager powerManager(powerConfig);
 TemperatureSensor::Config tempConfig;
 TemperatureSensor* temperatureSensor = nullptr;
 
-// Voltage sensor configuration
+// Voltage sensor configuration (battery)
 VoltageSensor::Config voltageConfig;
 VoltageSensor* voltageSensor = nullptr;
+
+// Solar charger voltage sensor configuration
+VoltageSensor::Config solarVoltageConfig;
+VoltageSensor* solarVoltageSensor = nullptr;
 
 // API endpoint
 const char* apiUrl = "https://stayproai-fa.azurewebsites.net/api/sensor/v1/challenge";
@@ -150,17 +154,27 @@ void callTemperatureAPI() {
     batteryAdcVoltage = 0; // Use error value
   }
   
+  // Read solar charger voltage from ADC
+  uint16_t solarChargerAdcVoltage;
+  HRESULT solarVoltageResult = solarVoltageSensor->ReadRawADC(solarChargerAdcVoltage);
+  
+  if (FAILED(solarVoltageResult)) {
+    Serial.println("Error: Could not read solar charger voltage from sensor");
+    solarChargerAdcVoltage = 0; // Use error value
+  }
+  
   // Create JSON payload using ArduinoJson
   JsonDocument payloadDoc;
   payloadDoc["deviceId"] = "chujka";
   payloadDoc["wifiSignalStrengthDbm"] = signalStrength;
   payloadDoc["temperatureCelsius"] = temperatureC;
   payloadDoc["batteryAdcVoltage"] = batteryAdcVoltage;
+  payloadDoc["solarPanelAdcVoltage"] = solarChargerAdcVoltage;
   
   String jsonPayload;
   serializeJson(payloadDoc, jsonPayload);
   
-  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C, Voltage: %d mV)\n", jsonPayload.c_str(), signalStrength, temperatureC, batteryAdcVoltage);
+  Serial.printf("Payload: %s (Signal: %d dBm, Temp: %.2f°C, Battery: %d mV, Solar: %d mV)\n", jsonPayload.c_str(), signalStrength, temperatureC, batteryAdcVoltage, solarChargerAdcVoltage);
   
   const int maxRetries = 3;
   bool success = false;
@@ -223,9 +237,13 @@ void setup() {
   tempConfig.oneWireBusPin = 4;
   temperatureSensor = new TemperatureSensor(tempConfig);
   
-  // Create voltage sensor
+  // Create voltage sensor (battery)
   voltageConfig.adcPin = 2;
   voltageSensor = new VoltageSensor(voltageConfig);
+  
+  // Create solar charger voltage sensor
+  solarVoltageConfig.adcPin = 3;
+  solarVoltageSensor = new VoltageSensor(solarVoltageConfig);
   
   // Connect to WiFi
   HRESULT wifiResult = connectWiFi();
@@ -249,6 +267,11 @@ void setup() {
   if (voltageSensor != nullptr) {
     delete voltageSensor;
     voltageSensor = nullptr;
+  }
+  
+  if (solarVoltageSensor != nullptr) {
+    delete solarVoltageSensor;
+    solarVoltageSensor = nullptr;
   }
   
   powerManager.GoToSleep();

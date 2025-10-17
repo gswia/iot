@@ -33,7 +33,7 @@ HRESULT VoltageSensor::ReadRawADC(uint16_t& rawValue)
     // Take multiple readings and store them
     for (int i = 0; i < numReadings; i++) {
         readings[i] = analogReadMilliVolts(m_config.adcPin);
-        delay(1); // Small delay between readings
+        delay(10); // Small delay between readings
     }
     
     // Calculate median

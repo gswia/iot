@@ -1,4 +1,5 @@
 #include "TemperatureSensor.h"
+#include "utils.h"
 
 TemperatureSensor::TemperatureSensor(const Config& config)
     : m_config(config)
@@ -35,20 +36,33 @@ HRESULT TemperatureSensor::ReadTemperature(float& tempC)
     // Initialize sensor if not already done
     Initialize();
     
-    // Request temperature reading
+    // Read temperature 16 times and take median for stability
     Serial.print("Reading temperature...");
-    m_sensors->requestTemperatures();
+    const int numReadings = 16;
+    float readings[numReadings];
     
-    // Get temperature from first sensor
-    tempC = m_sensors->getTempCByIndex(0);
-    
-    // Check for sensor disconnection error
-    if (tempC == DEVICE_DISCONNECTED_C) {
-        Serial.println("Error: Could not read temperature from sensor");
-        return E_SENSOR_DISCONNECTED;
+    // Take multiple readings and store them
+    for (int i = 0; i < numReadings; i++) {
+        // Request temperature reading
+        m_sensors->requestTemperatures();
+        
+        // Get temperature from first sensor
+        float currentTemp = m_sensors->getTempCByIndex(0);
+        
+        // Check for sensor disconnection error on each reading
+        if (currentTemp == DEVICE_DISCONNECTED_C) {
+            Serial.println("Error: Could not read temperature from sensor");
+            return E_SENSOR_DISCONNECTED;
+        }
+        
+        readings[i] = currentTemp;
+        delay(10); // Small delay between readings for sensor stability
     }
     
-    Serial.printf("%.2f°C\n", tempC);
+    // Calculate median
+    tempC = calculateMedian(readings, numReadings);
+    
+    Serial.printf("%.2f°C (median of %d readings)\n", tempC, numReadings);
     return S_OK;
 }
 
